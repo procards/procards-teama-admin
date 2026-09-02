@@ -85,10 +85,11 @@
       <div class="btn-row" style="align-items:flex-end">
         <div>
           <label>Turn-In Date</label>
-          <input type="date" id="summary-send-date">
+          <input type="date" id="summary-send-date" onchange="previewDailySummary()">
         </div>
         <button class="primary" onclick="sendDailySummaryEmails()">Send Summary Emails</button>
       </div>
+      <div id="summary-preview" style="margin-top:14px"></div>
       <div id="summary-send-result" style="margin-top:10px; font-size:13px; color:var(--text-muted)"></div>
 
       <h3 style="margin-top:36px">Recent Turn-Ins</h3>

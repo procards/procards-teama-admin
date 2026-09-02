@@ -46,6 +46,7 @@ async function initApp() {
   await loadUbCodes();
   document.getElementById('ti-date').valueAsDate = new Date();
   document.getElementById('summary-send-date').valueAsDate = new Date();
+  previewDailySummary();
   loadRecentTurnIns();
   setupDateFilter('ti-datefilter', () => loadVolume('turnins'));
   setupDateFilter('ap-datefilter', () => loadVolume('approvals'));
@@ -137,29 +138,60 @@ async function duplicateLastEntry() {
   document.getElementById('ti-client').focus();
 }
 
+async function getUnsentGroupedByAgent(date) {
+  const { data, error } = await sb.from('turn_ins').select('*').eq('date_turn_in', date).eq('email_sent', false);
+  if (error) { toast('Load failed: ' + error.message); return {}; }
+  const byAgent = {};
+  (data || []).forEach(r => {
+    const key = r.agent_id || 'unknown';
+    if (!byAgent[key]) byAgent[key] = { name: r.agent_name, entries: [] };
+    byAgent[key].entries.push(r);
+  });
+  return byAgent;
+}
+
+async function previewDailySummary() {
+  const date = document.getElementById('summary-send-date').value;
+  const box = document.getElementById('summary-preview');
+  if (!date) { box.innerHTML = ''; return; }
+
+  const byAgent = await getUnsentGroupedByAgent(date);
+  const keys = Object.keys(byAgent);
+
+  if (!keys.length) {
+    box.innerHTML = `<p style="color:var(--text-muted); font-size:13px">No unsent turn-ins for this date — either none were encoded, or a summary was already sent.</p>`;
+    return;
+  }
+
+  box.innerHTML = `
+    <p style="color:var(--text-muted); font-size:13px; margin-bottom:8px">This will email:</p>
+    <table><tbody>
+      ${keys.map(k => {
+        const g = byAgent[k];
+        const agent = AGENTS.find(a => a.id === k);
+        const emailNote = agent ? agent.email : '⚠ no email on file — will be skipped';
+        return `<tr><td>${g.name}</td><td>${g.entries.length} turn-in(s)</td><td style="color:var(--text-muted); font-size:12px">${emailNote}</td></tr>`;
+      }).join('')}
+    </tbody></table>
+  `;
+}
+
 async function sendDailySummaryEmails() {
   const date = document.getElementById('summary-send-date').value;
   if (!date) { toast('Pick a date first.'); return; }
 
-  const { data, error } = await sb.from('turn_ins').select('*').eq('date_turn_in', date).eq('email_sent', false);
-  if (error) { toast('Load failed: ' + error.message); return; }
-  const rows = data || [];
-  if (!rows.length) {
+  const byAgent = await getUnsentGroupedByAgent(date);
+  const keys = Object.keys(byAgent);
+  if (!keys.length) {
     document.getElementById('summary-send-result').textContent = 'No unsent turn-ins for that date.';
     return;
   }
 
-  const byAgent = {};
-  rows.forEach(r => {
-    if (!byAgent[r.agent_id]) byAgent[r.agent_id] = { name: r.agent_name, entries: [] };
-    byAgent[r.agent_id].entries.push(r);
-  });
-
-  let sentAgents = 0, sentEntries = 0;
-  for (const agentId in byAgent) {
+  let sentAgents = 0, sentEntries = 0, skipped = [];
+  for (const agentId of keys) {
     const group = byAgent[agentId];
     const agent = AGENTS.find(a => a.id === agentId);
-    if (!agent) continue;
+    if (!agent || !agent.email) { skipped.push(group.name); continue; }
 
     const summaryList = group.entries.map(e =>
       `${e.client_name} — ${e.agency} (${(e.banks || []).join(', ')})`
@@ -179,13 +211,16 @@ async function sendDailySummaryEmails() {
       sentAgents++;
       sentEntries += group.entries.length;
     } catch (e) {
-      console.warn('Email failed for', agent.name, e);
+      console.warn('Email failed for', group.name, e);
+      skipped.push(group.name + ' (send failed)');
     }
   }
 
   document.getElementById('summary-send-result').textContent =
-    `Sent to ${sentAgents} agent(s), covering ${sentEntries} turn-in(s).`;
+    `Sent to ${sentAgents} agent(s), covering ${sentEntries} turn-in(s).` +
+    (skipped.length ? ` Skipped: ${skipped.join(', ')}.` : '');
   loadRecentTurnIns();
+  previewDailySummary();
 }
 
 async function loadRecentTurnIns() {
