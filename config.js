@@ -20,7 +20,7 @@ const CONFIG = {
 
   // Email sending for agent turn-in summaries (Tab 1) — EmailJS free tier works well
   // for a static GitHub Pages site with no backend server.
-  EMAILJS_SERVICE_ID: "YOUR-EMAILJS-SERVICE-ID",
-  EMAILJS_TEMPLATE_ID: "YOUR-EMAILJS-TEMPLATE-ID",
-  EMAILJS_PUBLIC_KEY: "YOUR-EMAILJS-PUBLIC-KEY",
+  EMAILJS_SERVICE_ID: "service_uggs0gw",
+  EMAILJS_TEMPLATE_ID: "template_9od5afk",
+  EMAILJS_PUBLIC_KEY: "94RIhk1TOPr_iKYlA",
 };
