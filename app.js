@@ -45,6 +45,7 @@ async function initApp() {
   await loadBanks();
   await loadUbCodes();
   document.getElementById('ti-date').valueAsDate = new Date();
+  document.getElementById('summary-send-date').valueAsDate = new Date();
   loadRecentTurnIns();
   setupDateFilter('ti-datefilter', () => loadVolume('turnins'));
   setupDateFilter('ap-datefilter', () => loadVolume('approvals'));
@@ -113,7 +114,6 @@ async function submitTurnIn() {
 
   if (error) { toast('Save failed: ' + error.message); return; }
 
-  await sendTurnInEmail(data, agent);
   toast('Turn-in saved.');
   document.getElementById('ti-client').value = '';
   loadRecentTurnIns();
@@ -137,20 +137,55 @@ async function duplicateLastEntry() {
   document.getElementById('ti-client').focus();
 }
 
-async function sendTurnInEmail(turnIn, agent) {
-  try {
-    await emailjs.send(CONFIG.EMAILJS_SERVICE_ID, CONFIG.EMAILJS_TEMPLATE_ID, {
-      to_email: agent.email,
-      agent_name: agent.name,
-      client_name: turnIn.client_name,
-      agency: turnIn.agency,
-      banks: (turnIn.banks || []).join(', '),
-      date_turn_in: turnIn.date_turn_in
-    }, CONFIG.EMAILJS_PUBLIC_KEY);
-    await sb.from('turn_ins').update({ email_sent: true }).eq('id', turnIn.id);
-  } catch (e) {
-    console.warn('Email send failed', e);
+async function sendDailySummaryEmails() {
+  const date = document.getElementById('summary-send-date').value;
+  if (!date) { toast('Pick a date first.'); return; }
+
+  const { data, error } = await sb.from('turn_ins').select('*').eq('date_turn_in', date).eq('email_sent', false);
+  if (error) { toast('Load failed: ' + error.message); return; }
+  const rows = data || [];
+  if (!rows.length) {
+    document.getElementById('summary-send-result').textContent = 'No unsent turn-ins for that date.';
+    return;
   }
+
+  const byAgent = {};
+  rows.forEach(r => {
+    if (!byAgent[r.agent_id]) byAgent[r.agent_id] = { name: r.agent_name, entries: [] };
+    byAgent[r.agent_id].entries.push(r);
+  });
+
+  let sentAgents = 0, sentEntries = 0;
+  for (const agentId in byAgent) {
+    const group = byAgent[agentId];
+    const agent = AGENTS.find(a => a.id === agentId);
+    if (!agent) continue;
+
+    const summaryList = group.entries.map(e =>
+      `${e.client_name} — ${e.agency} (${(e.banks || []).join(', ')})`
+    ).join('\n');
+
+    try {
+      await emailjs.send(CONFIG.EMAILJS_SERVICE_ID, CONFIG.EMAILJS_TEMPLATE_ID, {
+        to_email: agent.email,
+        agent_name: agent.name,
+        date_turn_in: date,
+        total_count: group.entries.length,
+        turn_ins_summary: summaryList
+      }, CONFIG.EMAILJS_PUBLIC_KEY);
+
+      const ids = group.entries.map(e => e.id);
+      await sb.from('turn_ins').update({ email_sent: true }).in('id', ids);
+      sentAgents++;
+      sentEntries += group.entries.length;
+    } catch (e) {
+      console.warn('Email failed for', agent.name, e);
+    }
+  }
+
+  document.getElementById('summary-send-result').textContent =
+    `Sent to ${sentAgents} agent(s), covering ${sentEntries} turn-in(s).`;
+  loadRecentTurnIns();
 }
 
 async function loadRecentTurnIns() {
