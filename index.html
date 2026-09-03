@@ -51,8 +51,6 @@
       <label>Agency</label>
       <select id="ti-agency" onchange="onAgencyChange()">
         <option value="">Select agency</option>
-        <option value="ORC">ORC Marketing Services</option>
-        <option value="ECR">ECR</option>
       </select>
       <p style="color:var(--text-muted); font-size:12px; margin-top:6px">Unionbank has no turn-in step — it's screened directly by Agent Code in the Screen Report tab.</p>
 
@@ -116,9 +114,6 @@
       <label>Agency this report is from</label>
       <select id="sr-agency">
         <option value="">Select agency</option>
-        <option value="ORC">ORC Marketing Services</option>
-        <option value="ECR">ECR</option>
-        <option value="Unionbank">Unionbank</option>
       </select>
 
       <div class="upload-box" onclick="document.getElementById('sr-file').click()">
@@ -141,9 +136,6 @@
           <label>Filter by Agency</label>
           <select id="sum-agency" onchange="loadSummary()">
             <option value="">All agencies</option>
-            <option value="ORC">ORC Marketing Services</option>
-            <option value="ECR">ECR</option>
-            <option value="Unionbank">Unionbank</option>
           </select>
         </div>
         <button class="secondary" onclick="exportSummaryToExcel()">Download as Excel</button>
@@ -215,21 +207,19 @@
       </div>
 
       <div class="settings-block">
-        <h3>ORC Banks</h3>
+        <h3>Agencies</h3>
+        <p style="color:var(--text-muted); font-size:12px; margin-top:-6px">Add new bank-list agency tie-ups here. They'll appear automatically in Turn-In, Screen Report, and Summary Report.</p>
         <div class="row-inline">
-          <div><input type="text" id="set-bank-orc" placeholder="Bank name"></div>
-          <div style="flex:0"><button class="secondary" onclick="addBank('ORC')">+ Add Bank</button></div>
+          <div><input type="text" id="set-agency-name" placeholder="Agency name"></div>
+          <div style="flex:0"><button class="secondary" onclick="addAgencyRow()">+ Add Agency</button></div>
         </div>
-        <table><tbody id="settings-banks-orc-table"></tbody></table>
+        <table><tbody id="settings-agencies-table"></tbody></table>
       </div>
 
       <div class="settings-block">
-        <h3>ECR Banks</h3>
-        <div class="row-inline">
-          <div><input type="text" id="set-bank-ecr" placeholder="Bank name"></div>
-          <div style="flex:0"><button class="secondary" onclick="addBank('ECR')">+ Add Bank</button></div>
-        </div>
-        <table><tbody id="settings-banks-ecr-table"></tbody></table>
+        <h3>Banks per Agency</h3>
+        <p style="color:var(--text-muted); font-size:12px; margin-top:-6px">Each agency gets its own bank list and Add Bank button — including new ones you add above.</p>
+        <div id="banks-by-agency"></div>
       </div>
 
       <div class="settings-block">

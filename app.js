@@ -2,6 +2,7 @@
 
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 let AGENTS = [];
+let AGENCIES = [];
 let BANKS = { ORC: [], ECR: [] };
 let UB_CODES = [];
 let charts = {};
@@ -53,8 +54,10 @@ function toast(msg) {
 // ---------- INIT ----------
 async function initApp() {
   await loadAgents();
+  await loadAgencies();
   await loadBanks();
   await loadUbCodes();
+  populateAgencyDropdowns();
   document.getElementById('ti-date').valueAsDate = new Date();
   document.getElementById('summary-send-date').valueAsDate = new Date();
   loadRecentTurnIns();
@@ -77,10 +80,36 @@ async function loadAgents() {
   ubSel.innerHTML = AGENTS.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
 }
 
+async function loadAgencies() {
+  const { data } = await sb.from('agencies').select('*').order('name');
+  AGENCIES = data || [];
+}
+
+function populateAgencyDropdowns() {
+  const names = AGENCIES.map(a => a.name);
+
+  const tiSel = document.getElementById('ti-agency');
+  tiSel.innerHTML = '<option value="">Select agency</option>' +
+    names.map(n => `<option value="${n}">${n}</option>`).join('');
+
+  const srSel = document.getElementById('sr-agency');
+  srSel.innerHTML = '<option value="">Select agency</option>' +
+    names.map(n => `<option value="${n}">${n}</option>`).join('') +
+    '<option value="Unionbank">Unionbank</option>';
+
+  const sumSel = document.getElementById('sum-agency');
+  sumSel.innerHTML = '<option value="">All agencies</option>' +
+    names.map(n => `<option value="${n}">${n}</option>`).join('') +
+    '<option value="Unionbank">Unionbank</option>';
+}
+
 async function loadBanks() {
   const { data } = await sb.from('banks').select('*').order('bank_name');
-  BANKS.ORC = (data || []).filter(b => b.agency === 'ORC');
-  BANKS.ECR = (data || []).filter(b => b.agency === 'ECR');
+  BANKS = {};
+  (data || []).forEach(b => {
+    if (!BANKS[b.agency]) BANKS[b.agency] = [];
+    BANKS[b.agency].push(b);
+  });
 }
 
 async function loadUbCodes() {
@@ -92,11 +121,14 @@ async function loadUbCodes() {
 function onAgencyChange() {
   const agency = document.getElementById('ti-agency').value;
   const bankWrap = document.getElementById('ti-bank-wrap');
-  if (agency === 'ORC' || agency === 'ECR') {
+  const isKnownAgency = AGENCIES.some(a => a.name === agency);
+  if (isKnownAgency) {
     bankWrap.style.display = 'block';
-    const list = BANKS[agency];
+    const list = BANKS[agency] || [];
     const banksDiv = document.getElementById('ti-banks');
-    if (list.length === 1) {
+    if (list.length === 0) {
+      banksDiv.innerHTML = `<p style="color:var(--text-muted); font-size:13px">No banks added for ${agency} yet — add one in Settings.</p>`;
+    } else if (list.length === 1) {
       banksDiv.innerHTML = `<label><input type="checkbox" value="${list[0].bank_name}" checked disabled> ${list[0].bank_name}</label>`;
     } else {
       banksDiv.innerHTML = list.map(b => `<label><input type="checkbox" value="${b.bank_name}"> ${b.bank_name}</label>`).join('');
@@ -558,18 +590,36 @@ function renderChart(canvasId, counts, color) {
 // ---------- TAB 5: SETTINGS ----------
 async function renderSettings() {
   await loadAgents();
+  await loadAgencies();
   await loadBanks();
   await loadUbCodes();
+  populateAgencyDropdowns();
 
   document.getElementById('settings-agents-table').innerHTML = AGENTS.map(a => `
     <tr><td>${a.name}</td><td>${a.email}</td>
     <td><button class="icon-btn danger" onclick="deleteAgent('${a.id}')">Delete</button></td></tr>`).join('');
 
-  document.getElementById('settings-banks-orc-table').innerHTML = BANKS.ORC.map(b => `
-    <tr><td>${b.bank_name}</td><td><button class="icon-btn danger" onclick="deleteBank('${b.id}')">Delete</button></td></tr>`).join('');
+  document.getElementById('settings-agencies-table').innerHTML = AGENCIES.map(a => `
+    <tr><td>${a.name}</td>
+    <td><button class="icon-btn danger" onclick="deleteAgencyRow('${a.id}')">Delete</button></td></tr>`).join('');
 
-  document.getElementById('settings-banks-ecr-table').innerHTML = BANKS.ECR.map(b => `
-    <tr><td>${b.bank_name}</td><td><button class="icon-btn danger" onclick="deleteBank('${b.id}')">Delete</button></td></tr>`).join('');
+  const allBanks = Object.values(BANKS).flat();
+  document.getElementById('banks-by-agency').innerHTML = AGENCIES.map(agency => {
+    const banksForAgency = BANKS[agency.name] || [];
+    return `
+      <div style="margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--border)">
+        <h4 style="margin:0 0 8px; font-size:14px; color:var(--gold-light)">${agency.name} Banks</h4>
+        <div class="row-inline">
+          <div><input type="text" id="bank-input-${agency.id}" placeholder="Bank name"></div>
+          <div style="flex:0"><button class="secondary" onclick="addBankForAgency('${agency.id}','${agency.name}')">+ Add Bank</button></div>
+        </div>
+        <table><tbody>
+          ${banksForAgency.map(b => `
+            <tr><td>${b.bank_name}</td>
+            <td><button class="icon-btn danger" onclick="deleteBank('${b.id}')">Delete</button></td></tr>`).join('')}
+        </tbody></table>
+      </div>`;
+  }).join('') || '<p style="color:var(--text-muted); font-size:13px">Add an agency above first.</p>';
 
   document.getElementById('settings-ubcodes-table').innerHTML = UB_CODES.map(c => `
     <tr><td>${c.agents ? c.agents.name : ''}</td><td>${c.agent_code}</td>
@@ -587,12 +637,21 @@ async function addAgent() {
 }
 async function deleteAgent(id) { await sb.from('agents').delete().eq('id', id); renderSettings(); }
 
-async function addBank(agency) {
-  const inputId = agency === 'ORC' ? 'set-bank-orc' : 'set-bank-ecr';
-  const name = document.getElementById(inputId).value.trim();
-  if (!name) return;
-  await sb.from('banks').insert({ agency, bank_name: name });
-  document.getElementById(inputId).value = '';
+async function addAgencyRow() {
+  const name = document.getElementById('set-agency-name').value.trim();
+  if (!name) { toast('Enter an agency name.'); return; }
+  const { error } = await sb.from('agencies').insert({ name });
+  if (error) { toast('Add failed: ' + error.message); return; }
+  document.getElementById('set-agency-name').value = '';
+  renderSettings();
+}
+async function deleteAgencyRow(id) { await sb.from('agencies').delete().eq('id', id); renderSettings(); }
+
+async function addBankForAgency(agencyId, agencyName) {
+  const input = document.getElementById(`bank-input-${agencyId}`);
+  const name = input.value.trim();
+  if (!name) { toast('Enter a bank name.'); return; }
+  await sb.from('banks').insert({ agency: agencyName, bank_name: name });
   renderSettings();
 }
 async function deleteBank(id) { await sb.from('banks').delete().eq('id', id); renderSettings(); }
