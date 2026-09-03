@@ -23,4 +23,7 @@ const CONFIG = {
   EMAILJS_SERVICE_ID: "service_qxp1mzs",
   EMAILJS_TEMPLATE_ID: "template_9od5afk",
   EMAILJS_PUBLIC_KEY: "94RIhk1TOPr_iKYlA",
+
+  // Google Sheet sync — paste the Web App URL from google-sheet-sync.gs deployment here.
+  GOOGLE_SHEET_WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbwK1jMNhhuj0JPRMJLSBN1qw4iSQolCa3QUtZwCw5iXtxrznspznr_IJ6Q9R1BQqkVc/exec",
 };
