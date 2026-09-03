@@ -7,6 +7,16 @@ let UB_CODES = [];
 let charts = {};
 let editingTurnInId = null;
 
+function syncToSheet(record, action = 'save') {
+  if (!CONFIG.GOOGLE_SHEET_WEBHOOK_URL || CONFIG.GOOGLE_SHEET_WEBHOOK_URL.startsWith('YOUR-')) return;
+  fetch(CONFIG.GOOGLE_SHEET_WEBHOOK_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ ...record, action })
+  }).catch(e => console.warn('Sheet sync failed', e));
+}
+
 // ---------- PIN GATE ----------
 function checkPin() {
   const val = document.getElementById('pinInput').value;
@@ -116,14 +126,18 @@ async function submitTurnIn() {
     client_name: client, date_turn_in: date, encoded_by: encodedBy
   };
 
-  let error;
+  let error, savedId = editingTurnInId;
   if (editingTurnInId) {
     ({ error } = await sb.from('turn_ins').update(record).eq('id', editingTurnInId));
   } else {
-    ({ error } = await sb.from('turn_ins').insert(record));
+    const result = await sb.from('turn_ins').insert(record).select().single();
+    error = result.error;
+    savedId = result.data ? result.data.id : null;
   }
 
   if (error) { toast('Save failed: ' + error.message); return; }
+
+  if (savedId) syncToSheet({ id: savedId, ...record }, 'save');
 
   toast(editingTurnInId ? 'Turn-in updated.' : 'Turn-in saved.');
   cancelEditTurnIn();
@@ -163,6 +177,7 @@ async function deleteTurnIn(id) {
   if (!confirm('Delete this turn-in? This cannot be undone.')) return;
   const { error } = await sb.from('turn_ins').delete().eq('id', id);
   if (error) { toast('Delete failed: ' + error.message); return; }
+  syncToSheet({ id }, 'delete');
   toast('Turn-in deleted.');
   loadRecentTurnIns();
 }
