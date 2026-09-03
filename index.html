@@ -80,16 +80,22 @@
         <button class="secondary" onclick="duplicateLastEntry()">Duplicate Last Entry</button>
       </div>
 
-      <h3 style="margin-top:36px">Send Daily Summary</h3>
-      <p style="color:var(--text-muted); font-size:13px; margin-top:-8px">Sends one email per agent, listing all their turn-ins for the selected date.</p>
+      <h3 style="margin-top:36px">Send Turn-In Summary</h3>
+      <p style="color:var(--text-muted); font-size:13px; margin-top:-8px">Select an agent to preview their filtered summary, then send.</p>
       <div class="btn-row" style="align-items:flex-end">
         <div>
           <label>Turn-In Date</label>
-          <input type="date" id="summary-send-date" onchange="previewDailySummary()">
+          <input type="date" id="summary-send-date" onchange="onSummarySelectionChange()">
         </div>
-        <button class="primary" onclick="sendDailySummaryEmails()">Send Summary Emails</button>
+        <div>
+          <label>Agent</label>
+          <select id="summary-agent-select" onchange="onSummarySelectionChange()">
+            <option value="">Select agent</option>
+          </select>
+        </div>
       </div>
       <div id="summary-preview" style="margin-top:14px"></div>
+      <button class="primary" id="summary-send-btn" style="display:none" onclick="sendAgentSummaryEmail()">Send Summary Email</button>
       <div id="summary-send-result" style="margin-top:10px; font-size:13px; color:var(--text-muted)"></div>
 
       <h3 style="margin-top:36px">Recent Turn-Ins</h3>
