@@ -5,6 +5,7 @@ let AGENTS = [];
 let BANKS = { ORC: [], ECR: [] };
 let UB_CODES = [];
 let charts = {};
+let editingTurnInId = null;
 
 // ---------- PIN GATE ----------
 function checkPin() {
@@ -110,15 +111,59 @@ async function submitTurnIn() {
   const banks = Array.from(document.querySelectorAll('#ti-banks input:checked')).map(i => i.value);
   if (banks.length === 0) { toast('Select at least one bank.'); return; }
 
-  const { data, error } = await sb.from('turn_ins').insert({
+  const record = {
     agency, banks, agent_id: agentId, agent_name: agent.name,
     client_name: client, date_turn_in: date, encoded_by: encodedBy
-  }).select().single();
+  };
+
+  let error;
+  if (editingTurnInId) {
+    ({ error } = await sb.from('turn_ins').update(record).eq('id', editingTurnInId));
+  } else {
+    ({ error } = await sb.from('turn_ins').insert(record));
+  }
 
   if (error) { toast('Save failed: ' + error.message); return; }
 
-  toast('Turn-in saved.');
+  toast(editingTurnInId ? 'Turn-in updated.' : 'Turn-in saved.');
+  cancelEditTurnIn();
   document.getElementById('ti-client').value = '';
+  loadRecentTurnIns();
+}
+
+function editTurnIn(id) {
+  const row = LAST_TURN_INS.find(t => t.id === id);
+  if (!row) return;
+  editingTurnInId = id;
+
+  document.getElementById('ti-agency').value = row.agency;
+  onAgencyChange();
+  document.getElementById('ti-agent').value = row.agent_id;
+  document.getElementById('ti-client').value = row.client_name;
+  document.getElementById('ti-date').value = row.date_turn_in;
+  document.getElementById('ti-encodedby').value = row.encoded_by;
+  setTimeout(() => {
+    document.querySelectorAll('#ti-banks input').forEach(cb => {
+      if ((row.banks || []).includes(cb.value)) cb.checked = true;
+    });
+  }, 0);
+
+  document.getElementById('save-turnin-btn').textContent = 'Update Turn-In';
+  document.getElementById('cancel-edit-btn').style.display = 'inline-block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditTurnIn() {
+  editingTurnInId = null;
+  document.getElementById('save-turnin-btn').textContent = 'Save Turn-In';
+  document.getElementById('cancel-edit-btn').style.display = 'none';
+}
+
+async function deleteTurnIn(id) {
+  if (!confirm('Delete this turn-in? This cannot be undone.')) return;
+  const { error } = await sb.from('turn_ins').delete().eq('id', id);
+  if (error) { toast('Delete failed: ' + error.message); return; }
+  toast('Turn-in deleted.');
   loadRecentTurnIns();
 }
 
@@ -218,10 +263,13 @@ async function sendAgentSummaryEmail() {
   }
 }
 
+let LAST_TURN_INS = [];
+
 async function loadRecentTurnIns() {
   const { data } = await sb.from('turn_ins').select('*').order('created_at', { ascending: false }).limit(25);
+  LAST_TURN_INS = data || [];
   const tbody = document.getElementById('ti-recent-table');
-  tbody.innerHTML = (data || []).map(t => `
+  tbody.innerHTML = LAST_TURN_INS.map(t => `
     <tr>
       <td>${t.date_turn_in}</td>
       <td>${t.agency}</td>
@@ -229,7 +277,10 @@ async function loadRecentTurnIns() {
       <td>${t.agent_name}</td>
       <td>${(t.banks || []).join(', ')}</td>
       <td>${t.encoded_by}</td>
-      <td>${t.email_sent ? '✅' : '—'}</td>
+      <td>
+        <button class="icon-btn" onclick="editTurnIn('${t.id}')">Edit</button>
+        <button class="icon-btn danger" onclick="deleteTurnIn('${t.id}')">Delete</button>
+      </td>
     </tr>`).join('');
 }
 
