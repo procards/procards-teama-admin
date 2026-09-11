@@ -97,7 +97,14 @@
       <button class="primary" id="summary-send-btn" style="display:none" onclick="sendAgentSummaryEmail()">Send Summary Email</button>
       <div id="summary-send-result" style="margin-top:10px; font-size:13px; color:var(--text-muted)"></div>
 
-      <h3 style="margin-top:36px">Recent Turn-Ins</h3>
+      <h3 id="ti-recent-heading" style="margin-top:36px">Recent Turn-Ins</h3>
+      <div class="btn-row" style="align-items:flex-end; margin-bottom:10px">
+        <div>
+          <label>Filter by Date Turn In</label>
+          <input type="date" id="ti-recent-datefilter" onchange="loadRecentTurnIns()">
+        </div>
+        <button class="secondary" onclick="clearRecentDateFilter()">Clear Filter</button>
+      </div>
       <table>
         <thead><tr><th>Date</th><th>Agency</th><th>Client</th><th>Agent</th><th>Bank(s)/Code</th><th>Encoded By</th><th>Actions</th></tr></thead>
         <tbody id="ti-recent-table"></tbody>
