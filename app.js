@@ -313,9 +313,20 @@ async function sendAgentSummaryEmail() {
 let LAST_TURN_INS = [];
 
 async function loadRecentTurnIns() {
-  const { data } = await sb.from('turn_ins').select('*').order('created_at', { ascending: false }).limit(25);
+  const dateFilter = document.getElementById('ti-recent-datefilter').value;
+  let query = sb.from('turn_ins').select('*').order('created_at', { ascending: false });
+  query = dateFilter ? query.eq('date_turn_in', dateFilter) : query.limit(25);
+  const { data } = await query;
   LAST_TURN_INS = data || [];
+
+  const heading = document.getElementById('ti-recent-heading');
+  heading.textContent = dateFilter ? `Turn-Ins for ${dateFilter}` : 'Recent Turn-Ins';
+
   const tbody = document.getElementById('ti-recent-table');
+  if (!LAST_TURN_INS.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted)">No turn-ins found${dateFilter ? ' for this date' : ''}.</td></tr>`;
+    return;
+  }
   tbody.innerHTML = LAST_TURN_INS.map(t => `
     <tr>
       <td>${t.date_turn_in}</td>
@@ -329,6 +340,11 @@ async function loadRecentTurnIns() {
         <button class="icon-btn danger" onclick="deleteTurnIn('${t.id}')">Delete</button>
       </td>
     </tr>`).join('');
+}
+
+function clearRecentDateFilter() {
+  document.getElementById('ti-recent-datefilter').value = '';
+  loadRecentTurnIns();
 }
 
 // ---------- TAB 2: SCREEN REPORT ----------
