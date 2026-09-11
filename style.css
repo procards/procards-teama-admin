@@ -140,7 +140,7 @@ button.primary:hover { background: var(--gold-light); }
 button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
 button.secondary:hover { border-color: var(--gold); color: var(--gold-light); }
 
-.btn-row { display: flex; gap: 10px; align-items: center; }
+.btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 /* ---------- TABLE ---------- */
 table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }

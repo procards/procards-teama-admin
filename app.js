@@ -78,6 +78,9 @@ async function loadAgents() {
     AGENTS.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
   const ubSel = document.getElementById('set-ub-agent');
   ubSel.innerHTML = AGENTS.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+  const recentAgentFilter = document.getElementById('ti-recent-agentfilter');
+  recentAgentFilter.innerHTML = '<option value="">All agents</option>' +
+    AGENTS.map(a => `<option value="${a.name}">${a.name}</option>`).join('');
 }
 
 async function loadAgencies() {
@@ -312,19 +315,36 @@ async function sendAgentSummaryEmail() {
 
 let LAST_TURN_INS = [];
 
+let recentSearchDebounce = null;
+function onRecentSearchInput() {
+  clearTimeout(recentSearchDebounce);
+  recentSearchDebounce = setTimeout(loadRecentTurnIns, 300);
+}
+
 async function loadRecentTurnIns() {
   const dateFilter = document.getElementById('ti-recent-datefilter').value;
+  const agentFilter = document.getElementById('ti-recent-agentfilter').value;
+  const searchFilter = document.getElementById('ti-recent-searchfilter').value.trim();
+
   let query = sb.from('turn_ins').select('*').order('created_at', { ascending: false });
-  query = dateFilter ? query.eq('date_turn_in', dateFilter) : query.limit(25);
+  if (dateFilter) query = query.eq('date_turn_in', dateFilter);
+  if (agentFilter) query = query.eq('agent_name', agentFilter);
+  if (searchFilter) query = query.ilike('client_name', `%${searchFilter}%`);
+  if (!dateFilter && !agentFilter && !searchFilter) query = query.limit(25);
+
   const { data } = await query;
   LAST_TURN_INS = data || [];
 
   const heading = document.getElementById('ti-recent-heading');
-  heading.textContent = dateFilter ? `Turn-Ins for ${dateFilter}` : 'Recent Turn-Ins';
+  const parts = [];
+  if (searchFilter) parts.push(`matching "${searchFilter}"`);
+  if (agentFilter) parts.push(`for ${agentFilter}`);
+  if (dateFilter) parts.push(`on ${dateFilter}`);
+  heading.textContent = parts.length ? `Turn-Ins ${parts.join(' ')}` : 'Recent Turn-Ins';
 
   const tbody = document.getElementById('ti-recent-table');
   if (!LAST_TURN_INS.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted)">No turn-ins found${dateFilter ? ' for this date' : ''}.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted)">No turn-ins found${parts.length ? ' for this filter' : ''}.</td></tr>`;
     return;
   }
   tbody.innerHTML = LAST_TURN_INS.map(t => `
@@ -342,8 +362,10 @@ async function loadRecentTurnIns() {
     </tr>`).join('');
 }
 
-function clearRecentDateFilter() {
+function clearRecentFilters() {
   document.getElementById('ti-recent-datefilter').value = '';
+  document.getElementById('ti-recent-agentfilter').value = '';
+  document.getElementById('ti-recent-searchfilter').value = '';
   loadRecentTurnIns();
 }
 

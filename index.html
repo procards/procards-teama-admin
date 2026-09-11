@@ -100,10 +100,20 @@
       <h3 id="ti-recent-heading" style="margin-top:36px">Recent Turn-Ins</h3>
       <div class="btn-row" style="align-items:flex-end; margin-bottom:10px">
         <div>
+          <label>Search Client Name</label>
+          <input type="text" id="ti-recent-searchfilter" placeholder="Type full name or surname" oninput="onRecentSearchInput()">
+        </div>
+        <div>
           <label>Filter by Date Turn In</label>
           <input type="date" id="ti-recent-datefilter" onchange="loadRecentTurnIns()">
         </div>
-        <button class="secondary" onclick="clearRecentDateFilter()">Clear Filter</button>
+        <div>
+          <label>Filter by Agent</label>
+          <select id="ti-recent-agentfilter" onchange="loadRecentTurnIns()">
+            <option value="">All agents</option>
+          </select>
+        </div>
+        <button class="secondary" onclick="clearRecentFilters()">Clear Filters</button>
       </div>
       <table>
         <thead><tr><th>Date</th><th>Agency</th><th>Client</th><th>Agent</th><th>Bank(s)/Code</th><th>Encoded By</th><th>Actions</th></tr></thead>
